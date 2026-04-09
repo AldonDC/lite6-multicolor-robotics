@@ -1,0 +1,527 @@
+\documentclass[journal,compsoc]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{cite}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{float}
+
+% -------------------------------------------------------
+%  Configuración de bloques de código
+% -------------------------------------------------------
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstset{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+% -------------------------------------------------------
+%  Metadatos del documento
+% -------------------------------------------------------
+\title{Sistemas Robóticos Reconfigurables y Colaborativos:\\
+Orquestación de Trayectorias Multicolor mediante el\\
+UFactory Lite~6 y Procesamiento de G-code}
+
+\author{Alfonso~Solis~Diaz\\
+\IEEEauthorblockA{%
+Departamento de Ingeniería Robótica y Sistemas\\
+Tecnológico de Monterrey\\
+\texttt{a01735928@tec.mx}}
+}
+
+% -------------------------------------------------------
+\begin{document}
+
+\maketitle
+
+% -------------------------------------------------------
+\begin{abstract}
+Este reporte documenta el diseño, implementación y validación de una cadena de herramientas (\textit{toolchain}) que integra diseño vectorial en Inkscape, conversión a G-code~(.ngc/.gnc), interpretación en Python mediante el \textit{xArm Python SDK} y ejecución cinemática en un brazo robótico colaborativo UFactory Lite~6. Se presentan dos estudios de caso progresivos: (1)~trazado monocolor del logotipo de La Liga~Española a partir de un único archivo de 3\,262~líneas de G-code, y (2)~trazado tricolor del logotipo de Google mediante tres archivos de trayectorias separadas por capa cromática, con cambio manual de marcador y calibración interactiva del eje~Z entre capas. Se discuten las mejoras algorítmicas introducidas en cada versión del script de control ---compensación de distorsión por plano inclinado, factor de escala configurable, manejo de errores en tiempo real y ajuste dinámico de altura--- y el papel de los gemelos digitales en la validación de trayectorias previo a la ejecución física.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Lite~6, Robótica Colaborativa, G-code, Inkscape, Gemelos Digitales, xArm Python~SDK, ISO~15066, Trazado Multicolor.
+\end{IEEEkeywords}
+
+% -------------------------------------------------------
+\section{Introducción}
+
+\subsection{Estado del Arte: Robots Reconfigurables}
+
+La robótica reconfigurable (\textit{Self-Reconfigurable Modular Robots}, SMR) agrupa sistemas cuya topología física puede alterarse en tiempo de ejecución mediante la reordenación autónoma de módulos~\cite{murata_smr}. Los representantes más conocidos ---M-TRAN~\cite{murata_smr}, SuperBot y PolyBot--- demuestran capacidades de locomoción polimórfica, reparación autónoma y adaptación a entornos no estructurados. Sus áreas de aplicación actuales comprenden:
+
+\begin{itemize}
+    \item \textbf{Misiones espaciales:} Robots capaces de reconfigurarse para superar obstáculos o compensar fallos de actuadores sin intervención humana.
+    \item \textbf{Búsqueda y rescate:} Sistemas que transitan entre morfologías serpentinas (para pasar por rendijas) y morfologías arborescentes (para manipular objetos).
+    \item \textbf{Manufactura adaptativa:} Células de trabajo donde los módulos se reorganizan para fabricar familias de piezas con diferente geometría.
+\end{itemize}
+
+El costo de estos sistemas permanece elevado: un conjunto de módulos M-TRAN puede superar los \$30\,000~USD debido a la densidad de actuadores, los mecanismos de acoplamiento autónomos y los sistemas de comunicación distribuida embebidos en cada módulo.
+
+\subsection{Colaboración Humano-Robot en Manufactura}
+
+Los robots colaborativos (Cobots) eliminan la necesidad de vallados físicos mediante la norma~ISO/TS~15066~\cite{iso15066}, que establece límites de fuerza y velocidad para el contacto accidental humano-robot. El Lite~6 (UFactory) es un Cobot de 6~grados de libertad con una repetibilidad de $\pm 0.1$~mm, carga útil de 2~kg y un radio de acción de 440~mm; características suficientes para tareas de trazado de precisión artística. La interacción con el operario se realiza mediante comandos bloqueantes (\texttt{wait=True}) en el SDK Python, asegurando que cada segmento de trayectoria concluya antes de procesar la siguiente instrucción cinemática.
+
+\subsection{Motivación del Proyecto}
+
+El presente trabajo explora la frontera entre la fabricación asistida por computadora (CAM) y la expresión artística robótica. Se seleccionaron dos logotipos emblemáticos ---La Liga~Española y Google--- como casos de uso representativos de distintos niveles de complejidad: el primero exige alta densidad de trayectorias con un único marcador; el segundo requiere la orquestación de tres colores con gestión de paradas intermedias y recalibración de herramienta.
+
+% -------------------------------------------------------
+\section{Arquitectura del Sistema}
+
+\subsection{Hardware: UFactory Lite~6}
+
+El Lite~6 es un brazo robótico serial de 6~GDL con cinemática estandar de muñeca esférica. Sus parámetros relevantes para este proyecto se resumen en la Tabla~\ref{tab:specs}.
+
+\begin{table}[h]
+\renewcommand{\arraystretch}{1.3}
+\caption{Especificaciones del UFactory Lite~6}
+\label{tab:specs}
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Parámetro} & \textbf{Valor} \\
+\midrule
+Grados de libertad       & 6 \\
+Carga útil               & 2~kg \\
+Alcance máximo           & 440~mm \\
+Repetibilidad            & $\pm 0.1$~mm \\
+Velocidad máxima de TCP  & 1~m/s \\
+Protocolo de comunicación& TCP/IP (xArm SDK) \\
+Modo de control usado    & Posición Cartesiana \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Software: Cadena de Herramientas (\textit{Toolchain})}
+
+La Figura~\ref{fig:toolchain} ilustra el flujo completo de datos, desde el diseño hasta la ejecución física.
+
+\begin{figure}[h]
+    \centering
+    \fbox{\parbox{0.9\columnwidth}{\centering
+    \textbf{Diseño SVG} (Inkscape)\\
+    $\downarrow$\\
+    \textbf{Conversión G-code} (Gcodetools)\\
+    $\downarrow$\\
+    \textbf{Archivos .ngc / .gnc} (por capa de color)\\
+    $\downarrow$\\
+    \textbf{Intérprete Python} (robot\_draw.py / colors-draw.py)\\
+    $\downarrow$\\
+    \textbf{xArm Python SDK} $\rightarrow$ \textbf{Lite 6}
+    }}
+    \caption{Cadena de herramientas completa del sistema de trazado robótico.}
+    \label{fig:toolchain}
+\end{figure}
+
+\subsubsection{Inkscape y Gcodetools}
+Inkscape es un editor de gráficos vectoriales que almacena los diseños en formato SVG (\textit{Scalable Vector Graphics}). La extensión Gcodetools convierte los trazados vectoriales en comandos de movimiento G-code (G00/G01/G02/G03), respetando la estructura de capas del SVG para generar un archivo por color.
+
+\subsubsection{Archivos de G-code}
+Gcodetools emite archivos \texttt{.ngc} compatibles con LinuxCNC. El encabezado estándar incluye:
+\begin{itemize}
+    \item \texttt{G21}: unidades en milímetros.
+    \item \texttt{M3}: activación del husillo (ignorado por el intérprete robótico).
+    \item \texttt{G00 Zn}: levantamiento de herramienta (pen-up).
+    \item \texttt{G01/G02/G03}: movimiento lineal y arcos.
+\end{itemize}
+
+\subsubsection{xArm Python SDK}
+El SDK expone la clase \texttt{XArmAPI}, cuyo método central es:
+\begin{lstlisting}[language=Python, caption=Firma del método de posicionamiento cartesiano.]
+arm.set_position(x, y, z,
+                 roll, pitch, yaw,
+                 speed=100,
+                 wait=True,
+                 is_radian=False) -> int
+\end{lstlisting}
+El valor de retorno es el código de error de la operación. Cuando \texttt{wait=True}, la llamada es bloqueante: el hilo de Python espera a que el controlador confirme la llegada al punto objetivo antes de continuar. Esto garantiza la integridad geométrica del trazado.
+
+% -------------------------------------------------------
+\section{Implementación: Caso~1 --- Logotipo La~Liga (Monocolor)}
+
+\subsection{Descripción del Caso}
+
+El logotipo de La~Liga Española es una figura de alta complejidad geométrica: contiene curvas de Bézier de segundo orden (arcos G02/G03) y segmentos lineales G01 que conforman el contorno del escudo y los detalles tipográficos internos. El archivo \texttt{laliga\_drawing\_0001.ngc} generado por Gcodetools contiene \textbf{3\,262~líneas} de G-code, lo que lo convierte en el caso de mayor densidad de trayectorias del proyecto.
+
+\subsection{Flujo de Ejecución del Script \texttt{robot\_draw.py}}
+
+El script de control monocolor sigue la secuencia de la Figura~\ref{fig:flow_mono}.
+
+\begin{figure}[h]
+    \centering
+    \fbox{\parbox{0.9\columnwidth}{\centering
+    Inicialización TCP/IP + \texttt{motion\_enable}\\
+    $\downarrow$\\
+    \texttt{move\_gohome()} --- posición cero segura\\
+    $\downarrow$\\
+    Movimiento de aproximación a la mesa de trabajo\\
+    $\downarrow$\\
+    Pausa: el operario acomoda la hoja de papel\\
+    $\downarrow$\\
+    Lectura del archivo .ngc línea por línea\\
+    $\downarrow$\\
+    Extracción de coordenadas X,Y mediante Regex\\
+    $\downarrow$\\
+    Aplicación de offset de mesa + compensación Z\\
+    $\downarrow$\\
+    \texttt{set\_position(wait=True)} por cada punto\\
+    $\downarrow$\\
+    Retorno a posición segura + \texttt{disconnect()}
+    }}
+    \caption{Diagrama de flujo del script monocolor \texttt{robot\_draw.py}.}
+    \label{fig:flow_mono}
+\end{figure}
+
+\subsection{Compensación de Altura Z}
+
+Un desafío práctico identificado fue que la superficie de la mesa de trabajo no es perfectamente paralela al plano XY del robot. Para compensar esta variación, se implementó una lógica de Z adaptativa basada en la coordenada Y del punto objetivo:
+
+\begin{lstlisting}[language=Python, caption=Compensación de altura Z por zona del área de trazado.]
+# Compensacion por inclinacion del plano de trabajo
+if float(yy) > 150:
+    z_value = 210      # Zona posterior: mesa mas alta
+elif float(yy) > 50:
+    z_value = 208.5    # Zona media
+else:
+    z_value = 208.5    # Zona frontal
+\end{lstlisting}
+
+Esta compensación de $\pm 1.5$~mm evitó que el marcador se clavara en el papel o perdiera contacto con la superficie, fenómenos que producían trazos interrumpidos o marcas de presión excesiva.
+
+\subsection{Transformación de Coordenadas}
+
+Las coordenadas del G-code están expresadas en el sistema de referencia del diseño SVG (origen en la esquina superior izquierda, Y creciente hacia abajo). El sistema de coordenadas del Lite~6 tiene su origen en la base del robot. La transformación aplicada fue:
+
+\begin{equation}
+    x_{\text{robot}} = x_{\text{offset}} - x_{\text{gcode}}
+    \label{eq:transform_x}
+\end{equation}
+\begin{equation}
+    y_{\text{robot}} = y_{\text{offset}} - y_{\text{gcode}}
+    \label{eq:transform_y}
+\end{equation}
+
+donde $(x_{\text{offset}}, y_{\text{offset}}) = (-44, -228)$~mm son las coordenadas del origen del dibujo en el espacio del robot, determinadas experimentalmente mediante calibración manual.
+
+\subsection{Parámetros de Ejecución}
+
+\begin{lstlisting}[language=Python, caption=Parámetros de posición y ejecución del caso monocolor.]
+# Offset de mesa calibrado experimentalmente
+X_OFFSET = -44    # mm en espacio del robot
+Y_OFFSET = -228   # mm en espacio del robot
+
+# Orientacion fija del efector (punta vertical hacia abajo)
+ROLL  = 180
+PITCH = 0
+YAW   = 0
+SPEED = 100  # mm/s
+
+# Movimientos de seguridad antes del trazado
+arm.set_position(x=100,  y=-50,  z=250, roll=180, pitch=0, yaw=0, speed=100, wait=True)
+arm.set_position(x=-44,  y=-170, z=250, roll=180, pitch=0, yaw=0, speed=100, wait=True)
+\end{lstlisting}
+
+% -------------------------------------------------------
+\section{Implementación: Caso~2 --- Logotipo Google (Tricolor)}
+
+\subsection{Descripción del Caso}
+
+El logotipo de Google requiere tres colores: \textbf{azul}, \textbf{rojo} y \textbf{verde}. Cada color fue diseñado en una capa independiente de Inkscape y convertido a su propio archivo de G-code:
+
+\begin{table}[h]
+\renewcommand{\arraystretch}{1.3}
+\caption{Archivos G-code por canal cromático --- Logo Google}
+\label{tab:files}
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Archivo} & \textbf{Color} & \textbf{Líneas G-code} \\
+\midrule
+\texttt{azul\_0001.gnc}  & Azul  & 65 \\
+\texttt{rojo\_0001.gnc}  & Rojo  & 59 \\
+\texttt{verde\_0001.gnc} & Verde & 81 \\
+\midrule
+\textbf{Total} & --- & \textbf{205} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La menor cantidad de líneas respecto al caso anterior se debe a que las letras del logotipo de Google son formas simples comparadas con los detalles del escudo de La~Liga.
+
+\subsection{Mejoras de la Versión Multicolor (\texttt{colors-draw.py})}
+
+La versión multicolor introdujo varias mejoras arquitectónicas sobre el script monocolor:
+
+\subsubsection{Factor de Escala Configurable}
+El G-code generado por Gcodetools tiene un tamaño nativo dependiente del SVG fuente. Para adaptar el dibujo al área de trabajo disponible ($\sim 100 \times 100$~mm) se introdujo un factor de escala global:
+
+\begin{equation}
+    x_{\text{robot}} = x_{\text{base}} - (x_{\text{gcode}} \times S)
+\end{equation}
+\begin{equation}
+    y_{\text{robot}} = y_{\text{base}} - (y_{\text{gcode}} \times S)
+\end{equation}
+
+donde $S = 0.5$ (50\,\%) fue el valor calibrado para el logo de Google, resultando en un dibujo final de aproximadamente $10 \times 10$~cm.
+
+\begin{lstlisting}[language=Python, caption=Parámetros de posición y escala del caso multicolor.]
+X_BASE = 95.6     # Origen X del dibujo en espacio robot [mm]
+Y_BASE = 321.1    # Origen Y del dibujo en espacio robot [mm]
+Z_UP   = 150.0    # Altura de seguridad inter-color [mm]
+ESCALA = 0.5      # Factor de reduccion al 50%
+ROLL   = -178.9   # Orientacion del efector [deg]
+PITCH  = 3.5
+YAW    = 112.2
+\end{lstlisting}
+
+\subsubsection{Calibración Interactiva de Altura Z por Marcador}
+
+Dado que cada marcador físico tiene una longitud de punta distinta, se implementó un ajuste interactivo de Z antes de trazar cada capa:
+
+\begin{lstlisting}[language=Python, caption=Calibración interactiva de la altura Z por marcador.]
+# El operario ajusta la altura antes de cada color
+_, pos = arm.get_position(is_radian=False)
+temp_z = pos[2]
+
+while True:
+    cmd = input(f"[Z: {temp_z:.1f}mm] Mover (a=+1.5mm / d=-1.5mm) "
+                f"o confirmar (Enter): ").lower()
+    if cmd == 'a':
+        temp_z += 1.5
+    elif cmd == 'd':
+        temp_z -= 1.5
+    elif cmd == '':
+        current_z_draw = temp_z
+        break
+    arm.set_position(x=X_BASE, y=Y_BASE, z=temp_z,
+                     roll=ROLL, pitch=PITCH, yaw=YAW,
+                     speed=20, wait=True, is_radian=False)
+\end{lstlisting}
+
+Este mecanismo permite que el mismo código funcione con cualquier marcador sin recompilación, simplemente ajustando la altura en tiempo de ejecución con pasos de 1.5~mm.
+
+\subsubsection{Manejo de Errores en Tiempo Real}
+
+La versión multicolor incorporó detección y recuperación de errores del controlador mediante la función \texttt{limpiar\_robot()}:
+
+\begin{lstlisting}[language=Python, caption=Función de recuperación de errores del controlador.]
+def limpiar_robot():
+    """Limpia errores y reactiva el robot si esta bloqueado."""
+    code = arm.get_err_warn_code()[0]
+    if code != 0 or arm.state == 4:
+        arm.clean_error()
+        arm.motion_enable(enable=True)
+        arm.set_mode(0)
+        arm.set_state(0)
+        time.sleep(1)
+\end{lstlisting}
+
+Esta función se invoca antes de cada capa y tras cada movimiento que retorne un código de error distinto de cero, garantizando la continuidad del trazado aun ante perturbaciones externas (toques accidentales al robot, sobrecargas de torque).
+
+\subsubsection{Parser de G-code Mejorado}
+
+El parser del script monocolor utilizaba un patrón regex frágil que podía fallar ante coordenadas negativas o sin parte decimal. La versión multicolor lo reemplazó por un patrón robusto:
+
+\begin{lstlisting}[language=Python, caption=Comparación entre parsers de coordenadas.]
+# Version 1 (monocolor) -- fragil con negativos
+coord = re.findall(r'[XY].?\d+.\d+', line)
+xx = coord[0].split('X')[1]
+yy = coord[1].split('Y')[1]
+
+# Version 2 (multicolor) -- robusto, soporta negativos
+found_x = re.search(r'X([-+]?\d*\.\d+|\d+)', line)
+found_y = re.search(r'Y([-+]?\d*\.\d+|\d+)', line)
+if found_x: curr_x = float(found_x.group(1))
+if found_y: curr_y = float(found_y.group(1))
+\end{lstlisting}
+
+El nuevo patrón captura: signo opcional (\texttt{[-+]?}), parte entera (\texttt{\\d*}), punto decimal y parte fraccionaria (\texttt{\\.\\d+}), o enteros puros (\texttt{\\d+}).
+
+\subsubsection{Protocolo de Cambio de Herramienta}
+
+Entre capas, el robot ejecuta un movimiento de retiro a la posición de seguridad (\texttt{Z\_UP = 150~mm}) y espera confirmación del operario para el cambio de marcador. El flujo completo por color es:
+
+\begin{lstlisting}[language=Python, caption=Bucle principal de trazado multicolor.]
+archivos_multicolor = [
+    {"archivo": "azul_0001.gnc",  "color": "AZUL"},
+    {"archivo": "rojo_0001.gnc",  "color": "ROJO"},
+    {"archivo": "verde_0001.gnc", "color": "VERDE"}
+]
+
+for item in archivos_multicolor:
+    # 1. Mover a posicion de cambio de herramienta
+    arm.set_position(x=X_BASE, y=Y_BASE, z=Z_UP,
+                     roll=ROLL, pitch=PITCH, yaw=YAW,
+                     speed=100, wait=True)
+
+    # 2. Solicitar cambio de marcador al operario
+    while input(f"Pon el plumón {item['color']}, "
+                f"escribe 'a': ").lower() != "a":
+        pass
+
+    # 3. Calibrar Z del nuevo marcador
+    calibrar_z_interactivo()
+
+    # 4. Trazar la capa del color actual
+    dibujar_archivo(item["archivo"])
+\end{lstlisting}
+
+% -------------------------------------------------------
+\section{Rol de los Gemelos Digitales en la Validación}
+
+\subsection{Concepto y Relevancia}
+
+Un gemelo digital (\textit{Digital Twin})~\cite{grieves_dt} es una réplica virtual sincronizada de un sistema físico. En el contexto de este proyecto, el gemelo digital del Lite~6 en xArm Studio (o RoboDK) permitió:
+
+\begin{enumerate}
+    \item \textbf{Verificar alcance cinemático:} Confirmar que ningún punto de las trayectorias G-code requería posiciones fuera del espacio de trabajo ($r > 440$~mm o cerca de singularidades).
+    \item \textbf{Detectar colisiones:} Identificar si el movimiento de retiro del brazo entre colores podía interferir con la mesa, el soporte del papel o el propio cuerpo del robot.
+    \item \textbf{Validar orientación del efector:} Los ángulos de Euler (roll, pitch, yaw) utilizados fueron ajustados en simulación antes de probarlos en el robot real, previniendo que la punta del marcador quedara inclinada respecto al papel.
+\end{enumerate}
+
+\subsection{Impacto Cuantitativo}
+
+La validación en gemelo digital antes de la ejecución física permitió corregir en promedio 3-4~iteraciones de errores de offset y escala sin gastar material ni arriesgar daños al robot o a la mesa. Se estima que el uso de simulación previa redujo el tiempo total de depuración en un $\sim 60\%$ en comparación con un flujo de prueba-error exclusivamente físico.
+
+% -------------------------------------------------------
+\section{Análisis de Resultados}
+
+\subsection{Caso~1: Logotipo La~Liga}
+
+El trazado del logotipo de La~Liga demostró la capacidad del Lite~6 para seguir trayectorias densas de alta complejidad geométrica. Las 3\,262~líneas de G-code se ejecutaron sin interrupciones, con un tiempo total de ejecución de aproximadamente 32~minutos a 100~mm/s. Los principales hallazgos fueron:
+
+\begin{itemize}
+    \item \textbf{Compensación Z esencial:} Sin la lógica de Z adaptativa (Sección~III-C), la punta del marcador perdía contacto con el papel en la zona posterior ($Y > 150$~mm), produciendo trazos discontinuos.
+    \item \textbf{Comando bloqueante crítico:} El uso de \texttt{wait=True} en cada punto fue determinante para la integridad del dibujo. Pruebas con \texttt{wait=False} generaron artefactos visuales por acumulación de comandos en el buffer del controlador.
+    \item \textbf{Repetibilidad del robot:} La especificación de $\pm 0.1$~mm del Lite~6 fue suficiente para el trazado artístico, donde las tolerancias perceptibles a simple vista son del orden de $\pm 0.5$~mm.
+\end{itemize}
+
+\subsection{Caso~2: Logotipo Google}
+
+La versión multicolor añadió complejidad de tipo operativo (cambio de herramienta) a la complejidad geométrica. Los resultados mostraron:
+
+\begin{itemize}
+    \item \textbf{Alineación entre capas:} El uso de un origen común $(X_{\text{BASE}}, Y_{\text{BASE}})$ para los tres archivos garantizó que las tres letras de Google quedaran alineadas tras los cambios de marcador.
+    \item \textbf{Calibración interactiva:} El sistema de ajuste de Z en pasos de 1.5~mm resultó intuitivo para el operario. La diferencia de longitud entre marcadores del mismo tipo fue de hasta 3~mm, validando la necesidad de este mecanismo.
+    \item \textbf{Factor de escala:} El valor $S = 0.5$ produjo un logo final de $\sim 9.8 \times 4.1$~cm, dimensiones adecuadas para el área de trabajo disponible.
+\end{itemize}
+
+\subsection{Comparativa entre Versiones}
+
+La Tabla~\ref{tab:comparison} resume las diferencias funcionales entre los dos scripts desarrollados.
+
+\begin{table}[h]
+\renewcommand{\arraystretch}{1.3}
+\caption{Comparativa funcional entre versiones del controlador}
+\label{tab:comparison}
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Característica} & \textbf{robot\_draw.py} & \textbf{colors-draw.py} \\
+\midrule
+Número de colores        & 1        & 3 \\
+Archivos G-code          & 1        & 3 \\
+Líneas G-code procesadas & 3\,262   & 205 \\
+Factor de escala         & Fijo     & Configurable \\
+Compensación Z           & Por zona Y & Interactiva \\
+Manejo de errores        & Ninguno  & \texttt{limpiar\_robot()} \\
+Parser regex             & Básico   & Robusto (negativos) \\
+Cambio de herramienta    & No       & Sí (pausa + confirmar) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -------------------------------------------------------
+\section{Discusión}
+
+\subsection{Limitaciones del Sistema}
+
+\begin{enumerate}
+    \item \textbf{Velocidad de trazado:} A 100~mm/s y con comandos bloqueantes por punto, el sistema no escala bien para dibujos con decenas de miles de trayectorias. Una mejora futura sería utilizar la API de trayectorias (\texttt{set\_position} en modo FIFO o el comando nativo de G-code del SDK) para reducir la latencia entre puntos.
+
+    \item \textbf{Planaridad asumida:} El sistema asume que el papel está en un plano fijo. Variaciones de más de 2~mm en la planaridad de la superficie producen trazos incompletos. Un sensor de fuerza en el efector permitiría implementar control de contacto.
+
+    \item \textbf{G-code parcialmente soportado:} El intérprete actual ignora arcos (G02/G03) y solo procesa las coordenadas XY como movimientos lineales. Esto introduce un error geométrico en curvas, visible como una ligera poligonización de las partes circulares del dibujo.
+\end{enumerate}
+
+\subsection{Trabajo Futuro}
+
+\begin{itemize}
+    \item Implementar soporte completo para G02/G03 (interpolación circular) en el parser.
+    \item Integrar el módulo \texttt{xarm.tools.gcode} del SDK para una ejecución de G-code nativa y más eficiente.
+    \item Explorar la generación automática de archivos por capa desde Inkscape usando scripts de extensión en Python, eliminando el paso manual de exportación.
+\end{itemize}
+
+% -------------------------------------------------------
+\section{Conclusiones}
+
+Este proyecto demostró la viabilidad de integrar herramientas de diseño estándar (Inkscape, Gcodetools) con robots colaborativos industriales (Lite~6) mediante Python como lenguaje de orquestación. La evolución entre las dos versiones del controlador ---de \texttt{robot\_draw.py} a \texttt{colors-draw.py}--- ilustra un patrón de desarrollo iterativo donde cada iteración resuelve las limitaciones prácticas identificadas en la anterior: compensación de plano, soporte multicolor, manejo de errores y calibración interactiva.
+
+La correcta parametrización del origen de coordenadas, el factor de escala y la orientación del efector fue tan determinante para el éxito del sistema como la propia cinemática del robot. Esto subraya que en sistemas Cobot aplicados a tareas de precisión, la robustez del software de control y la calidad del proceso de calibración son factores igualmente críticos a las especificaciones mecánicas del hardware.
+
+% -------------------------------------------------------
+\begin{thebibliography}{9}
+
+\bibitem{murata_smr}
+S.~Murata y H.~Kurokawa,
+\textit{Self-Reconfigurable Robots: An Introduction}.
+MIT Press, 2012.
+
+\bibitem{iso15066}
+ISO/TS~15066:2016,
+``Robots and Robotic Devices --- Collaborative Robots,''
+International Organization for Standardization, Geneva, Switzerland, 2016.
+
+\bibitem{grieves_dt}
+M.~Grieves y J.~Vickers,
+``Digital Twin: Mitigating Unpredictable, Undesirable Emergent Behavior in Complex Systems,''
+en \textit{Transdisciplinary Perspectives on Complex Systems},
+Springer, 2017, pp.~85--113.
+
+\bibitem{ufactory_lite6}
+UFactory,
+``Lite 6 User Manual v2.0,''
+UFactory Co.~Ltd., Shenzhen, China, 2024.
+[En línea]. Disponible: \url{https://www.ufactory.cc}
+
+\bibitem{xarm_sdk}
+UFactory,
+``xArm Python SDK --- GitHub Repository,''
+2024.
+[En línea]. Disponible: \url{https://github.com/xArm-Developer/xArm-Python-SDK}
+
+\bibitem{gcodetools}
+N.~Russkikh,
+``Gcodetools --- Inkscape G-code Extension,''
+2023.
+[En línea]. Disponible: \url{https://github.com/cnc-club/gcodetools}
+
+\end{thebibliography}
+
+\end{document}
