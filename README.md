@@ -1,7 +1,7 @@
 # Lite 6 Multicolor Robotic Drawing System
 
 <p align="center">
-  <img src="https://ufactory.us/wp-content/uploads/2023/05/lite-6-1.png" alt="UFactory Lite 6" width="400">
+  <img src="https://www.robotshop.com/cdn/shop/files/xarm6-lite-01a_1200x1200.webp?v=1762949775" alt="UFactory Lite 6" width="400">
 </p>
 
 [![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
