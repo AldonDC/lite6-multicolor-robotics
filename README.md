@@ -1,5 +1,9 @@
 # Lite 6 Multicolor Robotic Drawing System
 
+<p align="center">
+  <img src="https://ufactory.us/wp-content/uploads/2023/05/lite-6-1.png" alt="UFactory Lite 6" width="400">
+</p>
+
 [![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/AldonDC/lite6-multicolor-robotics)
 [![Robot](https://img.shields.io/badge/Hardware-UFactory%20Lite%206-orange.svg)](https://www.ufactory.cc/lite-6-robotic-arm/)
@@ -11,6 +15,8 @@ This repository contains the technical implementation of an advanced robotic dra
 
 ### 📁 Directory Structure
 *   `scripts/`: Core kinematic control and G-code interpreter logic.
+    *   `colors-draw.py`: Main multicolor sequence controller.
+    *   `robot_draw.py`: Base single-color execution script.
 *   `gcode/`: Processed numerical control files (.ngc) exported from vector design software.
 *   `assets/images/`: Technical documentation assets and source image references.
 *   `latex/`: Academic report source code (IEEE standard compliant).
@@ -19,7 +25,7 @@ This repository contains the technical implementation of an advanced robotic dra
 ## Technical Workflow
 1.  **Vector Synthesis**: Design segmentation using layers in Inkscape.
 2.  **Path Generation**: Extraction of G-code paths (.ngc) optimized for the Lite 6 working envelope.
-3.  **Kinematic Execution**: Real-time trajectory processing via `multi_color_draw.py`, featuring manual tool change synchronization and Z-axis calibration.
+3.  **Kinematic Execution**: Real-time trajectory processing via `colors-draw.py`, featuring manual tool change synchronization and Z-axis calibration.
 
 ## Installation and Deployment
 
