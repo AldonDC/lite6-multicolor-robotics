@@ -2,6 +2,14 @@
 
 <p align="center">
   <img src="https://www.robotshop.com/cdn/shop/files/xarm6-lite-01a_1200x1200.webp?v=1762949775" alt="UFactory Lite 6" width="400">
+  <br>
+  <em>UFactory Lite 6 Robotic Arm</em>
+</p>
+
+<p align="center">
+  <img src="assets/images/result_image.jpeg" alt="Multicolor Drawing Result" width="400">
+  <br>
+  <em>Final Multicolor Drawing Result</em>
 </p>
 
 [![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
@@ -45,6 +53,9 @@ To initiate the multi-layer drawing sequence:
 ```bash
 python3 scripts/colors-draw.py
 ```
+
+### Video Evidence
+Watch the robot in action: [Execution Video](assets/videos/execution_video.mp4)
 
 ## Abstract and Research
 The project validates the use of Digital Twins and collaborative robotics in precision manufacturing scenarios. By simulating the assembly and drawing process, we achieve a significant reduction in collision risk and material waste.
