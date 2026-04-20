@@ -1,0 +1,215 @@
+/* ============================================
+   LITE 6 PRO — Aerospace Premium Theme
+   ============================================ */
+
+* {
+    font-family: "Inter", "SF Pro Display", "Segoe UI", "Roboto", sans-serif;
+}
+
+QMainWindow, QWidget {
+    background-color: #05070a;
+    color: #f0f6fc;
+}
+
+QLabel {
+    background: transparent;
+}
+
+/* ---------- SIDEBAR ---------- */
+QWidget#Sidebar {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #080c12, stop:1 #05070a);
+    border-right: 1px solid #161b22;
+}
+
+QLabel#BrandTitle {
+    font-size: 24px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1a1f26, stop:1 #05070a);
+    border-radius: 4px;
+}
+
+QLabel#BrandSubtitle {
+    font-size: 10px;
+    color: #58a6ff;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-weight: 800;
+}
+
+QLabel#SidebarSection {
+    font-size: 11px;
+    color: #484f58;
+    letter-spacing: 2px;
+    font-weight: 700;
+    padding-left: 4px;
+    margin-top: 24px;
+    margin-bottom: 8px;
+}
+
+QPushButton#NavButton {
+    background-color: transparent;
+    color: #8b949e;
+    border: none;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    margin: 2px 0px;
+}
+
+QPushButton#NavButton:hover {
+    background-color: #161b22;
+    color: #ffffff;
+}
+
+QPushButton#NavButton:checked {
+    background-color: #1f6feb;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* ---------- STATUS ---------- */
+QLabel#StatusLabel {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    padding: 12px;
+    border-radius: 10px;
+    background-color: #211c1d;
+    color: #ff7b72;
+    border: 1px solid #442d30;
+}
+
+QLabel#StatusLabelConnected {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    padding: 12px;
+    border-radius: 10px;
+    background-color: #161b22;
+    color: #3fb950;
+    border: 1px solid #238636;
+}
+
+/* ---------- BUTTONS ---------- */
+QPushButton {
+    background-color: #161b22;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #21262d;
+    border-color: #8b949e;
+}
+
+QPushButton:pressed {
+    background-color: #0d1117;
+}
+
+QPushButton#PrimaryAction {
+    background-color: #1f6feb;
+    border: 1px solid #388bfd;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 16px 24px;
+}
+
+QPushButton#PrimaryAction:hover {
+    background-color: #388bfd;
+    border-color: #58a6ff;
+}
+
+QPushButton#EmergencyStop {
+    background-color: #da3633;
+    border: 1px solid #f85149;
+    color: #ffffff;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 16px;
+    border-radius: 10px;
+}
+
+QPushButton#EmergencyStop:hover {
+    background-color: #f85149;
+}
+
+/* ---------- INPUTS ---------- */
+QDoubleSpinBox {
+    background-color: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 12px;
+    color: #f0f6fc;
+    font-size: 15px;
+}
+
+QDoubleSpinBox:focus {
+    border-color: #1f6feb;
+    background-color: #161b22;
+}
+
+/* ---------- LABELS ---------- */
+QLabel#PageTitle {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+}
+
+QLabel#PageSubtitle {
+    font-size: 14px;
+    color: #8b949e;
+    margin-bottom: 12px;
+}
+
+QLabel#SectionTitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ---------- CARDS ---------- */
+QFrame#Card, QFrame#ShapeCard {
+    background-color: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 16px;
+}
+
+QFrame#ShapeCard:hover {
+    border-color: #388bfd;
+    background-color: #161b22;
+}
+
+QFrame#Separator {
+    background-color: #21262d;
+    max-height: 1px;
+}
+
+/* ---------- PROGRESS ---------- */
+QProgressBar {
+    border: none;
+    border-radius: 4px;
+    text-align: center;
+    background-color: #21262d;
+    color: transparent;
+    height: 8px;
+}
+
+QProgressBar::chunk {
+    background-color: #1f6feb;
+    border-radius: 4px;
+}
+
