@@ -65,3 +65,4 @@ Deberá entregarse una WIKI en el mismo repositorio que el reporte del Módulo 1
 
 ---
 **Desarrollado en Tec de Monterrey [Robotics Intelligence]**
+Link para el video de youtube: https://youtu.be/TVq4lMy1ARM
